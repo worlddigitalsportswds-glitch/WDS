@@ -648,4 +648,4 @@ async def team_rank(interaction: discord.Interaction, 리그: app_commands.Choic
     await interaction.followup.send(embed=embed)
 
 
-bot.run('MTU1NjI0MjM3MTcyMzc4ODI5OA.GmgxhQ.sLQfRjqZcRRt0aM5jTEnpQe4clp_OIkt9URfVE')
+bot.run('MTU1NjI0MjM3MTcyMzc4ODI5OA.GqJx5C.6cc44rZYObl4ej0XqQrT7lu-oX6yeHQVC1B-6k')
