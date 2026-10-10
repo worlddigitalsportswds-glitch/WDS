@@ -1,17 +1,6 @@
-from flask import Flask
+import os
 import threading
-
-app = Flask(__name__)
-
-@app.route('/')
-def home():
-    return "Bot is alive!"
-
-def run_web():
-    app.run(host='0.0.0.0', port=10000)
-
-threading.Thread(target=run_web, daemon=True).start()
-
+from flask import Flask
 import discord
 from discord import app_commands
 from discord.ext import commands, tasks
@@ -25,6 +14,26 @@ BROADCAST_CHANNEL_ID = 1555555333894832158  # WDS 중계 배정 및 전광판 �
 GUILD_ID = 1554481615864991764
 # ========================================================
 
+# =========================================================
+# 1. Render 24시간 무중단 유지를 위한 Flask 웹서버
+# =========================================================
+app = Flask('')
+
+@app.route('/')
+def home():
+    return "WDS Discord Bot is alive and running!"
+
+def run_flask():
+    app.run(host='0.0.0.0', port=10000)
+
+def keep_alive():
+    t = threading.Thread(target=run_flask)
+    t.start()
+
+
+# =========================================================
+# 2. 봇 및 데이터 구조 설정
+# =========================================================
 latest_broadcast_data = "아직 중계 배정 채널에 등록된 중계 정보가 없습니다."
 live_scoreboard_message_id = None
 
@@ -36,7 +45,7 @@ REALTIME_RANK_DATA = {
     "kleague": "데이터 로딩 중..."
 }
 
-# 🎯 2026 시즌 대진 DB (사전 지정된 ID 없음, 초기 상태는 None)
+# 🎯 2026 시즌 대진 DB
 REAL_SEASON_SCHEDULE_DB = {
     "20261010": {
         "kbo": [
@@ -95,10 +104,25 @@ REAL_SEASON_SCHEDULE_DB = {
             {"id": None, "away": "전북 현대", "home": "FC 안양 (정규 최종 33R)", "time": "14:00", "stadium": "안양종합운동장"},
             {"id": None, "away": "광주 FC", "home": "부천 FC 1995 (정규 최종 33R)", "time": "14:00", "stadium": "부천종합운동장"},
             {"id": None, "away": "포항 스틸러스", "home": "울산 HD FC (정규 최종 33R)", "time": "14:00", "stadium": "울산 문수축구경기장"},
-            {"id": None, "away": "제주 SK FC", "home": "인천 유나이티드 (정규 최종 33R)", "time": "14:00", "stadium": "인천축구전용경기장"},
+            {"id": None, "away": "제주 FC", "home": "인천 유나이티드 (정규 최종 33R)", "time": "14:00", "stadium": "인천축구전용경기장"},
             {"id": None, "away": "대전 하나 시티즌", "home": "김천상무 (정규 최종 33R)", "time": "14:00", "stadium": "김천종합운동장"}
         ]
     }
+}
+
+# 구단 상세 정보 DB (새로 추가된 /팀정보 용)
+TEAM_DETAIL_DATA = {
+    "울산": {"full_name": "울산 HD FC", "league": "K리그1", "stadium": "울산 문수 축구 경기장", "color": 0x003399},
+    "수원": {"full_name": "수원 삼성 블루윙즈 / 수원 FC", "league": "K리그 / K리그1", "stadium": "수원 월드컵 경기장 / 수원 종합 운동장", "color": 0x0000FF},
+    "전북": {"full_name": "전북 현대 모터스", "league": "K리그1", "stadium": "전주 월드컵 경기장", "color": 0x005A36},
+    "포항": {"full_name": "포항 스틸러스", "league": "K리그1", "stadium": "포항 스틸야드", "color": 0xE60012},
+    "FC서울": {"full_name": "FC 서울", "league": "K리그1", "stadium": "서울 월드컵 경기장", "color": 0xC8102E},
+    "FC안양": {"full_name": "FC 안양", "league": "K리그1", "stadium": "안양 종합운동장", "color": 0x4B2E83},
+    "KIA": {"full_name": "KIA 타이거즈", "league": "KBO 리그", "stadium": "광주-기아 챔피언스 필드", "color": 0xC8102E},
+    "LG": {"full_name": "LG 트윈스", "league": "KBO 리그", "stadium": "서울 종합운동장 야구장 (잠실)", "color": 0xC60C30},
+    "삼성": {"full_name": "삼성 라이온즈", "league": "KBO 리그", "stadium": "대구 삼성 라이온즈 파크", "color": 0x0066B3},
+    "두산": {"full_name": "두산 베어스", "league": "KBO 리그", "stadium": "서울 종합운동장 야구장 (잠실)", "color": 0x131230},
+    "SSG": {"full_name": "SSG 랜더스", "league": "KBO 리그", "stadium": "인천 SSG 랜더스필드", "color": 0xCE0E2D}
 }
 
 class SportsBot(commands.Bot):
@@ -108,7 +132,8 @@ class SportsBot(commands.Bot):
         super().__init__(command_prefix="!", intents=intents)
 
     async def setup_hook(self):
-        print("🤖 글로벌 명령어 트리 준비 완료")
+        await self.tree.sync()
+        print("🤖 글로벌 명령어 트리 및 슬래시 명령어 동기화 완료")
 
 bot = SportsBot()
 
@@ -183,7 +208,7 @@ async def sync_commands(ctx):
         await ctx.send(f"❌ 동기화 에러: {e}")
 
 
-# 🆔 !ID 명령어: 중복 방지 및 입력 필수 지정 명령어
+# 🆔 !ID 명령어
 @bot.command(name="ID")
 @commands.has_role("WDS 운영본부")
 async def set_match_id(ctx, match_keyword: str, new_id: int):
@@ -194,13 +219,11 @@ async def set_match_id(ctx, match_keyword: str, new_id: int):
         await ctx.send("❌ 오늘 날짜에 등록된 경기 일정이 없습니다.")
         return
 
-    # 1️⃣ [중복 방지 검증] 이미 다른 경기에 사용 중인 ID인지 전체 DB 탐색
     duplicate_match_name = None
     for date_key, categories in REAL_SEASON_SCHEDULE_DB.items():
         for cat_name, matches in categories.items():
             for m in matches:
                 if m.get("id") == new_id:
-                    # 현재 설정하려는 대상 경기가 아닌 경우에만 중복으로 처리
                     if not (match_keyword in m["away"] or match_keyword in m["home"]):
                         duplicate_match_name = f"{m['away']} vs {m['home']}"
                         break
@@ -213,7 +236,6 @@ async def set_match_id(ctx, match_keyword: str, new_id: int):
         await ctx.send(f"⚠️ 이미 **`{duplicate_match_name}`** 경기에 적용된 경기 ID입니다. 다른 ID를 입력해주세요.")
         return
 
-    # 2️⃣ 키워드로 오늘 경기 찾아서 ID 부여
     found = False
     for category in ["kbo", "kleague"]:
         for match in REAL_SEASON_SCHEDULE_DB[today_str][category]:
@@ -236,7 +258,7 @@ async def on_command_error(ctx, error):
     if isinstance(error, commands.MissingRole):
         await ctx.send("⛔ 이 명령어를 사용할 수 있는 권한이 없습니다. (**WDS 운영본부** 역할이 필요합니다)")
     elif isinstance(error, commands.MissingRequiredArgument):
-        await ctx.send("❌ 인자가 부족합니다. 사용법을 확인해주세요!\n• ID 부여: `!ID 롯데 101` 또는 `!ID 서울 201`\n• 추가시간 정정: `!추가시간 101 2/30`")
+        await ctx.send("❌ 인자가 부족합니다. 사용법을 확인해주세요!\n• ID 부여: `!ID 롯데 101`\n• 추가시간 정정: `!추가시간 101 2/30`")
     else:
         print(f"[명령어 오류 발생]: {error}")
 
@@ -492,19 +514,19 @@ def parse_and_analyze_broadcast(text):
                     
                     if exact_mins_float < fh_end:
                         status_info = f"전반전 {diff_minutes if diff_minutes > 0 else 1}분 진행 중"
-                    elif fh_end <= exact_minutes_float < fh_extra_end:
+                    elif fh_end <= exact_mins_float < fh_extra_end:
                         it_sec = diff_seconds - (fh_end * 60)
                         it_min = int(it_sec // 60) + 1
                         status_info = f"전반전 45+{it_min}분 (추가시간)"
-                    elif fh_extra_end <= exact_minutes_float < ht_end:
+                    elif fh_extra_end <= exact_mins_float < ht_end:
                         rem_sec = (ht_end * 60) - diff_seconds
                         rem_ht = max(1, int(rem_sec // 60) + 1)
                         status_info = f"하프타임 휴식 중 (남은 휴식 약 {rem_ht}분)"
-                    elif ht_end <= exact_minutes_float < sh_end:
+                    elif ht_end <= exact_mins_float < sh_end:
                         sf_sec = diff_seconds - (ht_end * 60)
                         sf_min = int(sf_sec // 60) + 1
                         status_info = f"후반전 {sf_min}분 진행 중"
-                    elif sh_end <= exact_minutes_float < sh_extra_end:
+                    elif sh_end <= exact_mins_float < sh_extra_end:
                         it2_sec = diff_seconds - (sh_end * 60)
                         it2_min = int(it2_sec // 60) + 1
                         status_info = f"후반전 90+{it2_min}분 (추가시간)"
@@ -662,4 +684,41 @@ async def team_rank(interaction: discord.Interaction, 리그: app_commands.Choic
     await interaction.followup.send(embed=embed)
 
 
-bot.run('MTU1NjI0MjM3MTcyMzc4ODI5OA.GqJx5C.6cc44rZYObl4ej0XqQrT7lu-oX6yeHQVC1B-6k')
+# 5️⃣ /팀정보 (새로 추가된 구단 정보 슬래시 명령어)
+@bot.tree.command(name="팀정보", description="K리그 및 KBO 특정 팀의 상세 정보를 조회합니다.")
+@app_commands.describe(team_name="조회할 팀 이름을 입력하세요 (예: 울산, 수원, KIA, LG, 안양 등)")
+async def team_info(interaction: discord.Interaction, team_name: str):
+    await interaction.response.defer(thinking=True)
+    info = TEAM_DETAIL_DATA.get(team_name)
+    
+    if info:
+        embed = discord.Embed(
+            title=f"⚽⚾ {info['full_name']} 상세 정보",
+            color=info['color']
+        )
+        embed.add_field(name="소속 리그", value=info['league'], inline=True)
+        embed.add_field(name="홈 경기장", value=info['stadium'], inline=False)
+        embed.set_footer(text="WDS 운영본부 스포츠 관리 시스템")
+        
+        await interaction.followup.send(embed=embed)
+    else:
+        supported_teams = ", ".join(TEAM_DETAIL_DATA.keys())
+        await interaction.followup.send(
+            f"❌ **'{team_name}'** 팀 정보를 찾을 수 없습니다.\n💡 **지원되는 팀:** {supported_teams}",
+            ephemeral=True
+        )
+
+
+# =========================================================
+# 6. 메인 실행부 (Render 환경변수 및 Flask 웹서버 연동)
+# =========================================================
+if __name__ == "__main__":
+    # 백그라운드 웹서버 시작 (Render Sleep 방지)
+    keep_alive()
+    
+    # Render Environment Variables에 입력한 토큰 로드
+    token = os.environ.get('DISCORD_TOKEN')
+    if token:
+        bot.run(MTU1NjI0MjM3MTcyMzc4ODI5OA.GvwAMd.kNcFrMF6efQGtHPnixAf6iWT1y2tTFborGChjE)
+    else:
+        print("❌ ERROR: Render Environment Variable에서 DISCORD_TOKEN을 찾지 못했습니다!")
