@@ -717,8 +717,8 @@ if __name__ == "__main__":
     keep_alive()
     
     # Render Environment Variables에 입력한 토큰 로드
-    token = os.environ.get('MTU1NjI0MjM3MTcyMzc4ODI5OA.GvwAMd.kNcFrMF6efQGtHPnixAf6iWT1y2tTFborGChjE')
+    token = os.environ.get('DISCORD_TOKEN')
     if token:
-        bot.run(MTU1NjI0MjM3MTcyMzc4ODI5OA.GvwAMd.kNcFrMF6efQGtHPnixAf6iWT1y2tTFborGChjE)
+        bot.run('token')
     else:
         print("❌ ERROR: Render Environment Variable에서 DISCORD_TOKEN을 찾지 못했습니다!")
