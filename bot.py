@@ -717,7 +717,7 @@ if __name__ == "__main__":
     keep_alive()
     
     # Render Environment Variables에 입력한 토큰 로드
-    token = os.environ.get('DISCORD_TOKEN')
+    token = os.environ.get('MTU1NjI0MjM3MTcyMzc4ODI5OA.GvwAMd.kNcFrMF6efQGtHPnixAf6iWT1y2tTFborGChjE')
     if token:
         bot.run(MTU1NjI0MjM3MTcyMzc4ODI5OA.GvwAMd.kNcFrMF6efQGtHPnixAf6iWT1y2tTFborGChjE)
     else:
